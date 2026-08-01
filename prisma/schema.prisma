@@ -1,0 +1,180 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String    @id @default(cuid())
+  name         String
+  email        String    @unique
+  phone        String?
+  passwordHash String?
+  googleId     String?   @unique
+  role         Role      @default(USER)
+  avatarUrl    String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  dob          String?
+  gender       String?
+  bookings     Booking[]
+}
+
+model Movie {
+  id          String     @id @default(cuid())
+  title       String
+  synopsis    String
+  posterUrl   String
+  trailerUrl  String?
+  genre       String[]
+  language    String
+  format      String[]
+  runtimeMins Int
+  rating      String
+  cast        Json
+  releaseDate DateTime
+  isShowing   Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  director    String?
+  bannerUrl   String?
+  showtimes   Showtime[]
+}
+
+model Hall {
+  id          String     @id @default(cuid())
+  name        String
+  capacity    Int
+  screenType  String
+  soundSystem String
+  cinemaId    String?
+  cinema      Cinema?    @relation(fields: [cinemaId], references: [id])
+  seats       Seat[]
+  showtimes   Showtime[]
+}
+
+model Cinema {
+  id         String   @id @default(cuid())
+  name       String
+  address    String?
+  phone      String?
+  mapUrl     String?
+  isActive   Boolean  @default(true)
+  locationId String
+  createdAt  DateTime @default(now())
+  location   Location @relation(fields: [locationId], references: [id])
+  halls      Hall[]
+}
+
+model Location {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  cinemas   Cinema[]
+}
+
+model Seat {
+  id     String   @id @default(cuid())
+  hallId String
+  row    String
+  number Int
+  type   SeatType @default(STANDARD)
+  hall   Hall     @relation(fields: [hallId], references: [id])
+
+  @@unique([hallId, row, number])
+}
+
+model Showtime {
+  id           String     @id @default(cuid())
+  movieId      String
+  hallId       String
+  startsAt     DateTime
+  basePrice    Decimal    @db.Decimal(10, 2)
+  premiumPrice Decimal    @db.Decimal(10, 2)
+  bookings     Booking[]
+  seatHolds    SeatHold[]
+  hall         Hall       @relation(fields: [hallId], references: [id])
+  movie        Movie      @relation(fields: [movieId], references: [id])
+
+  @@index([movieId, startsAt])
+}
+
+model SeatHold {
+  id         String   @id @default(cuid())
+  showtimeId String
+  seatId     String
+  userId     String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  showtime   Showtime @relation(fields: [showtimeId], references: [id])
+
+  @@unique([showtimeId, seatId])
+}
+
+model Booking {
+  id          String        @id @default(cuid())
+  userId      String
+  showtimeId  String
+  totalAmount Decimal       @db.Decimal(10, 2)
+  status      BookingStatus @default(PENDING)
+  qrPayload   String?
+  createdAt   DateTime      @default(now())
+  showtime    Showtime      @relation(fields: [showtimeId], references: [id])
+  user        User          @relation(fields: [userId], references: [id])
+  seats       BookingSeat[]
+  payment     Payment?
+}
+
+model BookingSeat {
+  id             String  @id @default(cuid())
+  bookingId      String
+  seatId         String
+  priceAtBooking Decimal @db.Decimal(10, 2)
+  booking        Booking @relation(fields: [bookingId], references: [id])
+
+  @@unique([bookingId, seatId])
+}
+
+model Payment {
+  id          String        @id @default(cuid())
+  bookingId   String        @unique
+  provider    String
+  providerRef String?
+  amount      Decimal       @db.Decimal(10, 2)
+  status      PaymentStatus @default(INITIATED)
+  createdAt   DateTime      @default(now())
+  booking     Booking       @relation(fields: [bookingId], references: [id])
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum SeatType {
+  STANDARD
+  PREMIUM
+  RECLINER
+}
+
+enum SeatStatus {
+  AVAILABLE
+  HELD
+  BOOKED
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+  EXPIRED
+}
+
+enum PaymentStatus {
+  INITIATED
+  SUCCESS
+  FAILED
+}

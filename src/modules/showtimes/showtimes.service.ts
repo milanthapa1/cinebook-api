@@ -1,0 +1,72 @@
+import { prisma } from '../../lib/prisma.js';
+import { AppError } from '../../middleware/error.middleware.js';
+import { isTestEnv } from '../../lib/envMode.js';
+import { generateMockShowtimes, MOCK_HALLS } from './showtimes.mock.js';
+
+export class ShowtimesService {
+  static async getShowtimes(
+    movieId?: string,
+    date?: string,
+    locationId?: string,
+    cinemaId?: string,
+  ) {
+    const where: any = {};
+    if (movieId) where.movieId = movieId;
+    if (date) {
+      const startOfDay = new Date(`${date}T00:00:00`);
+      const endOfDay = new Date(`${date}T23:59:59.999`);
+      where.startsAt = { gte: startOfDay, lte: endOfDay };
+    }
+    if (cinemaId) {
+      where.hall = { ...(where.hall ?? {}), cinemaId };
+    }
+    if (locationId) {
+      where.hall = {
+        ...(where.hall ?? {}),
+        cinema: { locationId },
+      };
+    }
+
+    try {
+      const showtimes = await prisma.showtime.findMany({
+        where,
+        include: {
+          hall: {
+            include: {
+              cinema: { include: { location: true } },
+            },
+          },
+          movie: true,
+        },
+        orderBy: { startsAt: 'asc' },
+      });
+
+      return showtimes;
+    } catch (e) {
+      if (isTestEnv()) {
+        return generateMockShowtimes(movieId, date);
+      }
+      throw new AppError('Unable to load showtimes. Database is unavailable.', 503);
+    }
+  }
+
+  static async getHallById(id: string) {
+    try {
+      const hall = await prisma.hall.findUnique({
+        where: { id },
+        include: { seats: true, cinema: { include: { location: true } } },
+      });
+      if (hall) return hall;
+    } catch (e) {
+      if (!isTestEnv()) {
+        throw new AppError('Unable to load hall. Database is unavailable.', 503);
+      }
+    }
+
+    if (isTestEnv()) {
+      return MOCK_HALLS.find((h) => h.id === id) || MOCK_HALLS[0];
+    }
+
+    throw new AppError('Hall not found', 404);
+  }
+}

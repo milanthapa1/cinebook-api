@@ -1,0 +1,64 @@
+import { prisma } from '../../lib/prisma.js';
+import { AppError } from '../../middleware/error.middleware.js';
+import { SeatType } from '@prisma/client';
+
+export class AdminHallsService {
+  static async listHalls() {
+    return prisma.hall.findMany({
+      include: {
+        _count: { select: { seats: true, showtimes: true } },
+      },
+      orderBy: { name: 'asc' },
+    });
+  }
+
+  static async createHall(data: {
+    name: string;
+    capacity: number;
+    screenType: string;
+    soundSystem: string;
+    rows?: string[];
+    seatsPerRow?: number;
+  }) {
+    const { rows = ['A', 'B', 'C', 'D', 'E', 'F'], seatsPerRow = 10, ...hallData } = data;
+
+    const hall = await prisma.hall.create({ data: hallData });
+
+    // Auto-generate seats
+    for (let rIdx = 0; rIdx < rows.length; rIdx++) {
+      const row = rows[rIdx];
+      const type: SeatType =
+        rIdx < 2 ? 'STANDARD' : rIdx < 4 ? 'PREMIUM' : 'RECLINER';
+      for (let num = 1; num <= seatsPerRow; num++) {
+        await prisma.seat.create({
+          data: { hallId: hall.id, row, number: num, type },
+        });
+      }
+    }
+
+    return prisma.hall.findUnique({
+      where: { id: hall.id },
+      include: { _count: { select: { seats: true, showtimes: true } } },
+    });
+  }
+
+  static async updateHall(id: string, data: Partial<{
+    name: string;
+    capacity: number;
+    screenType: string;
+    soundSystem: string;
+  }>) {
+    const hall = await prisma.hall.findUnique({ where: { id } });
+    if (!hall) throw new AppError('Hall not found', 404);
+    return prisma.hall.update({ where: { id }, data });
+  }
+
+  static async deleteHall(id: string) {
+    const hall = await prisma.hall.findUnique({ where: { id } });
+    if (!hall) throw new AppError('Hall not found', 404);
+    // Delete seats first (FK constraint)
+    await prisma.seat.deleteMany({ where: { hallId: id } });
+    await prisma.hall.delete({ where: { id } });
+    return { message: 'Hall deleted' };
+  }
+}
