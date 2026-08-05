@@ -1,6 +1,6 @@
-import { prisma } from '../lib/prisma.js';
+﻿import { prisma } from '../lib/prisma.js';
 import { SeatsService } from '../modules/seats/seats.service.js';
-import { isTestEnv } from '../lib/envMode.js';
+import { isLocalEnv } from '../lib/envMode.js';
 
 export const releaseExpiredHolds = async () => {
   const now = new Date();
@@ -15,7 +15,7 @@ export const releaseExpiredHolds = async () => {
       console.log(`[Job]: Released ${deleted.count} expired seat holds from DB.`);
     }
   } catch (e) {
-    if (isTestEnv()) {
+    if (isLocalEnv()) {
       const memoryHolds = SeatsService.getMemoryHolds();
       let count = 0;
       for (const [key, hold] of memoryHolds.entries()) {
@@ -41,3 +41,4 @@ export const startHoldCleanupInterval = (intervalMs: number = 60000) => {
     });
   }, intervalMs);
 };
+

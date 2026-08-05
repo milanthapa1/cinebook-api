@@ -1,6 +1,6 @@
-import { prisma } from '../../lib/prisma.js';
+﻿import { prisma } from '../../lib/prisma.js';
 import { AppError } from '../../middleware/error.middleware.js';
-import { isTestEnv } from '../../lib/envMode.js';
+import { isLocalEnv } from '../../lib/envMode.js';
 import { generateMockShowtimes, MOCK_HALLS } from './showtimes.mock.js';
 
 export class ShowtimesService {
@@ -43,7 +43,7 @@ export class ShowtimesService {
 
       return showtimes;
     } catch (e) {
-      if (isTestEnv()) {
+      if (isLocalEnv()) {
         return generateMockShowtimes(movieId, date);
       }
       throw new AppError('Unable to load showtimes. Database is unavailable.', 503);
@@ -58,15 +58,16 @@ export class ShowtimesService {
       });
       if (hall) return hall;
     } catch (e) {
-      if (!isTestEnv()) {
+      if (!isLocalEnv()) {
         throw new AppError('Unable to load hall. Database is unavailable.', 503);
       }
     }
 
-    if (isTestEnv()) {
+    if (isLocalEnv()) {
       return MOCK_HALLS.find((h) => h.id === id) || MOCK_HALLS[0];
     }
 
     throw new AppError('Hall not found', 404);
   }
 }
+

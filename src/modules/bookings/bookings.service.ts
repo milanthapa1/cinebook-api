@@ -1,6 +1,6 @@
-import { prisma } from '../../lib/prisma.js';
+﻿import { prisma } from '../../lib/prisma.js';
 import { AppError } from '../../middleware/error.middleware.js';
-import { isTestEnv } from '../../lib/envMode.js';
+import { isLocalEnv } from '../../lib/envMode.js';
 import { computeBookingTotals, VAT_RATE } from '../../lib/pricing.js';
 import { SeatsService } from '../seats/seats.service.js';
 
@@ -36,7 +36,7 @@ export class BookingsService {
 
     const now = new Date();
 
-    if (!isTestEnv()) {
+    if (!isLocalEnv()) {
       try {
         const result = await prisma.$transaction(async (tx) => {
           const activeHolds = await tx.seatHold.findMany({
@@ -174,7 +174,7 @@ export class BookingsService {
   }
 
   static async getBookingById(bookingId: string) {
-    if (!isTestEnv()) {
+    if (!isLocalEnv()) {
       try {
         const booking = await prisma.booking.findUnique({
           where: { id: bookingId },
@@ -206,7 +206,7 @@ export class BookingsService {
   }
 
   static async getUserBookings(userId: string) {
-    if (!isTestEnv()) {
+    if (!isLocalEnv()) {
       try {
         return await prisma.booking.findMany({
           where: { userId },
@@ -229,3 +229,4 @@ export class BookingsService {
     return memoryBookings;
   }
 }
+

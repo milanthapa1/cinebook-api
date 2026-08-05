@@ -1,9 +1,9 @@
-import axios from 'axios';
+﻿import axios from 'axios';
 import { prisma } from '../../lib/prisma.js';
 import { env } from '../../config/env.js';
 import { AppError } from '../../middleware/error.middleware.js';
 import { BookingsService } from '../bookings/bookings.service.js';
-import { isTestEnv } from '../../lib/envMode.js';
+import { isLocalEnv } from '../../lib/envMode.js';
 
 export class PaymentsService {
   static async initiatePayment(bookingId: string, provider: 'khalti' | 'esewa') {
@@ -27,7 +27,7 @@ export class PaymentsService {
         },
       });
     } catch (e) {
-      if (!isTestEnv()) {
+      if (!isLocalEnv()) {
         throw new AppError('Unable to record payment. Database is unavailable.', 503);
       }
     }
@@ -100,7 +100,7 @@ export class PaymentsService {
         }),
       ]);
     } catch (e) {
-      if (!isTestEnv()) {
+      if (!isLocalEnv()) {
         throw new AppError('Unable to confirm payment. Database is unavailable.', 503);
       }
       const memoryBookings = BookingsService.getMemoryBookings();
@@ -125,3 +125,4 @@ export class PaymentsService {
     };
   }
 }
+

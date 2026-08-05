@@ -1,6 +1,6 @@
-import { prisma } from '../../lib/prisma.js';
+﻿import { prisma } from '../../lib/prisma.js';
 import { AppError } from '../../middleware/error.middleware.js';
-import { isTestEnv } from '../../lib/envMode.js';
+import { isLocalEnv } from '../../lib/envMode.js';
 
 // Memory store fallback for holds if DB is in mock/test mode
 const memoryHolds = new Map<string, { id: string; showtimeId: string; seatId: string; userId: string; expiresAt: Date }>();
@@ -45,7 +45,7 @@ export class SeatsService {
   static async getSeatsForShowtime(showtimeId: string, userId?: string) {
     const now = new Date();
 
-    if (!isTestEnv()) {
+    if (!isLocalEnv()) {
       try {
         const showtime = await prisma.showtime.findUnique({
           where: { id: showtimeId },
@@ -127,7 +127,7 @@ export class SeatsService {
 
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-    if (!isTestEnv()) {
+    if (!isLocalEnv()) {
       try {
         const holds = await prisma.$transaction(async (tx) => {
           const now = new Date();
@@ -200,7 +200,7 @@ export class SeatsService {
   }
 
   static async releaseHold(holdId: string, userId: string) {
-    if (!isTestEnv()) {
+    if (!isLocalEnv()) {
       await prisma.seatHold.deleteMany({ where: { id: holdId, userId } });
       return true;
     }
@@ -216,3 +216,4 @@ export class SeatsService {
     return memoryBookedSeats;
   }
 }
+

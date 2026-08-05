@@ -1,11 +1,11 @@
-import bcrypt from 'bcryptjs';
+﻿import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { OAuth2Client } from 'google-auth-library';
 import { prisma } from '../../lib/prisma.js';
 import { env } from '../../config/env.js';
 import { AppError } from '../../middleware/error.middleware.js';
 import { RegisterInput, LoginInput } from './auth.schema.js';
-import { isTestEnv } from '../../lib/envMode.js';
+import { isLocalEnv } from '../../lib/envMode.js';
 
 // In-memory fallback user store if DB connection fails
 const memoryUsers = new Map<string, any>();
@@ -56,7 +56,7 @@ export class AuthService {
       return { user: { id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role, avatarUrl: user.avatarUrl }, ...tokens };
     } catch (err: any) {
       if (err instanceof AppError) throw err;
-      if (!isTestEnv()) {
+      if (!isLocalEnv()) {
         throw new AppError('Registration unavailable. Database is unreachable.', 503);
       }
 
@@ -89,18 +89,18 @@ export class AuthService {
         where: { email: input.email },
       });
     } catch (err) {
-      if (!isTestEnv()) {
+      if (!isLocalEnv()) {
         throw new AppError('Login unavailable. Database is unreachable.', 503);
       }
       user = memoryUsers.get(input.email);
     }
 
-    if (!user && isTestEnv() && memoryUsers.has(input.email)) {
+    if (!user && isLocalEnv() && memoryUsers.has(input.email)) {
       user = memoryUsers.get(input.email);
     }
 
     if (!user) {
-      if (isTestEnv() && input.email === 'demo@cinebook.com' && input.password === 'password123') {
+      if (isLocalEnv() && input.email === 'demo@cinebook.com' && input.password === 'password123') {
         const hashedPassword = await bcrypt.hash('password123', 10);
         user = {
           id: 'usr_demo',
@@ -188,7 +188,7 @@ export class AuthService {
             },
           });
         } else {
-          // Brand new user — create account
+          // Brand new user â€” create account
           user = await prisma.user.create({
             data: {
               name: name ?? 'Google User',
@@ -196,7 +196,7 @@ export class AuthService {
               googleId,
               avatarUrl: picture ?? null,
               role: 'USER',
-              // passwordHash left null — this is a Google-only account
+              // passwordHash left null â€” this is a Google-only account
             },
           });
         }
@@ -216,7 +216,7 @@ export class AuthService {
       };
     } catch (err: any) {
       if (err instanceof AppError) throw err;
-      if (!isTestEnv()) {
+      if (!isLocalEnv()) {
         throw new AppError('Google login unavailable. Database is unreachable.', 503);
       }
 
@@ -261,7 +261,7 @@ export class AuthService {
       try {
         user = await prisma.user.findUnique({ where: { id: decoded.id } });
       } catch (e) {
-        if (!isTestEnv()) {
+        if (!isLocalEnv()) {
           throw new AppError('Token refresh unavailable. Database is unreachable.', 503);
         }
         for (const u of memoryUsers.values()) {
@@ -283,3 +283,4 @@ export class AuthService {
     }
   }
 }
+

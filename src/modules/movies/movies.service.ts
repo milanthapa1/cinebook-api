@@ -1,6 +1,6 @@
-import { prisma } from '../../lib/prisma.js';
+﻿import { prisma } from '../../lib/prisma.js';
 import { AppError } from '../../middleware/error.middleware.js';
-import { isTestEnv } from '../../lib/envMode.js';
+import { isLocalEnv } from '../../lib/envMode.js';
 
 export const MOCK_MOVIES = [
   {
@@ -15,7 +15,7 @@ export const MOCK_MOVIES = [
     runtimeMins: 166,
     rating: 'PG-13',
     cast: [
-      { name: 'Timothée Chalamet', role: 'Paul Atreides', photoUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=200' },
+      { name: 'TimothÃ©e Chalamet', role: 'Paul Atreides', photoUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&q=80&w=200' },
       { name: 'Zendaya', role: 'Chani', photoUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=200' },
       { name: 'Rebecca Ferguson', role: 'Lady Jessica', photoUrl: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&q=80&w=200' }
     ],
@@ -131,7 +131,7 @@ export class MoviesService {
 
       return movies;
     } catch (error) {
-      if (isTestEnv()) {
+      if (isLocalEnv()) {
         let filtered = [...MOCK_MOVIES];
         if (query.search) {
           const q = query.search.toLowerCase();
@@ -169,7 +169,7 @@ export class MoviesService {
       if (movie) return movie;
       return null;
     } catch (e) {
-      if (isTestEnv()) {
+      if (isLocalEnv()) {
         const mock = MOCK_MOVIES.find((m) => m.id === id);
         return mock ?? null;
       }
@@ -177,3 +177,4 @@ export class MoviesService {
     }
   }
 }
+
