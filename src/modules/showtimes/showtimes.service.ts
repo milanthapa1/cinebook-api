@@ -1,4 +1,4 @@
-﻿import { prisma } from '../../lib/prisma.js';
+import { prisma } from '../../lib/prisma.js';
 import { AppError } from '../../middleware/error.middleware.js';
 import { isLocalEnv } from '../../lib/envMode.js';
 import { generateMockShowtimes, MOCK_HALLS } from './showtimes.mock.js';
@@ -41,10 +41,17 @@ export class ShowtimesService {
         orderBy: { startsAt: 'asc' },
       });
 
-      return showtimes;
+      // Always filter out showtimes that have already started (with 10-min buffer)
+      const now = new Date();
+      const cutoff = new Date(now.getTime() - 10 * 60 * 1000);
+      return showtimes.filter((st) => new Date(st.startsAt) > cutoff);
     } catch (e) {
       if (isLocalEnv()) {
-        return generateMockShowtimes(movieId, date);
+        const mock = generateMockShowtimes(movieId, date);
+        // Filter out past/expired slots — real cinemas never show past showtimes
+        const now = new Date();
+        const cutoff = new Date(now.getTime() - 10 * 60 * 1000);
+        return mock.filter((st) => new Date(st.startsAt) > cutoff);
       }
       throw new AppError('Unable to load showtimes. Database is unavailable.', 503);
     }

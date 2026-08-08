@@ -2,14 +2,26 @@ import { prisma } from '../../lib/prisma.js';
 import { AppError } from '../../middleware/error.middleware.js';
 import { SeatType } from '@prisma/client';
 
+import { MOCK_HALLS } from '../showtimes/showtimes.mock.js';
+
 export class AdminHallsService {
   static async listHalls() {
-    return prisma.hall.findMany({
-      include: {
-        _count: { select: { seats: true, showtimes: true } },
-      },
-      orderBy: { name: 'asc' },
-    });
+    try {
+      const halls = await prisma.hall.findMany({
+        include: {
+          _count: { select: { seats: true, showtimes: true } },
+        },
+        orderBy: { name: 'asc' },
+      });
+      if (halls && halls.length > 0) return halls;
+    } catch (e) {
+      // DB fallback
+    }
+
+    return MOCK_HALLS.map((h) => ({
+      ...h,
+      _count: { seats: h.capacity || 60, showtimes: 4 },
+    }));
   }
 
   static async createHall(data: {

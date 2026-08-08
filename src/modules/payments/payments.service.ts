@@ -1,8 +1,8 @@
-﻿import axios from 'axios';
+import axios from 'axios';
 import { prisma } from '../../lib/prisma.js';
 import { env } from '../../config/env.js';
 import { AppError } from '../../middleware/error.middleware.js';
-import { BookingsService } from '../bookings/bookings.service.js';
+import { BookingsService, saveMemoryBookingsToFile } from '../bookings/bookings.service.js';
 import { isLocalEnv } from '../../lib/envMode.js';
 
 export class PaymentsService {
@@ -104,6 +104,7 @@ export class PaymentsService {
           status: 'SUCCESS',
           createdAt: new Date(),
         };
+        saveMemoryBookingsToFile();
       }
     }
 

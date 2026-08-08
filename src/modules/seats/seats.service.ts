@@ -1,10 +1,30 @@
-﻿import { prisma } from '../../lib/prisma.js';
+import { prisma } from '../../lib/prisma.js';
 import { AppError } from '../../middleware/error.middleware.js';
 import { isLocalEnv } from '../../lib/envMode.js';
 
+import { getMockShowtimeById } from '../showtimes/showtimes.mock.js';
+
+/** Extract trailing row+number from a seat ID like `seat_hall_1_C5` → {row:'C', num:5} */
+function parseSeatKey(seatId: string): { row: string; num: number; clean: string } {
+  const trailMatch = seatId.match(/([A-Fa-f])([0-9]+)$/);
+  if (trailMatch) {
+    const row = trailMatch[1].toUpperCase();
+    const num = parseInt(trailMatch[2], 10);
+    return { row, num, clean: `${row}${num}` };
+  }
+  const allMatches = Array.from(seatId.matchAll(/([A-Fa-f])([0-9]+)/g));
+  if (allMatches.length > 0) {
+    const last = allMatches[allMatches.length - 1];
+    const row = last[1].toUpperCase();
+    const num = parseInt(last[2], 10);
+    return { row, num, clean: `${row}${num}` };
+  }
+  return { row: 'A', num: 1, clean: 'A1' };
+}
+
 // Memory store fallback for holds if DB is in mock/test mode
-const memoryHolds = new Map<string, { id: string; showtimeId: string; seatId: string; userId: string; expiresAt: Date }>();
-const memoryBookedSeats = new Set<string>(); // key: `${showtimeId}_${seatId}`
+const memoryHolds = new Map<string, { id: string; showtimeId: string; hallId: string; startsAtKey: string; seatId: string; userId: string; expiresAt: Date }>();
+const memoryBookedSeats = new Set<string>(); // key: `${showtimeId}_${seatId}` or `${hallId}_${startsAtKey}_${seatClean}`
 
 export interface SeatWithStatus {
   id: string;
@@ -45,28 +65,20 @@ export class SeatsService {
   static async getSeatsForShowtime(showtimeId: string, userId?: string) {
     const now = new Date();
 
-    if (!isLocalEnv()) {
-      try {
-        const showtime = await prisma.showtime.findUnique({
-          where: { id: showtimeId },
-          include: {
-            hall: { include: { seats: true } },
-            seatHolds: { where: { expiresAt: { gt: now } } },
-            bookings: {
-              where: { status: { in: ['CONFIRMED', 'PENDING'] } },
-              include: { seats: true },
-            },
+    try {
+      const showtime = await prisma.showtime.findUnique({
+        where: { id: showtimeId },
+        include: {
+          hall: { include: { seats: true } },
+          seatHolds: { where: { expiresAt: { gt: now } } },
+          bookings: {
+            where: { status: { in: ['CONFIRMED', 'PENDING'] } },
+            include: { seats: true },
           },
-        });
+        },
+      });
 
-        if (!showtime) {
-          throw new AppError('Showtime not found', 404);
-        }
-
-        if (!showtime.hall) {
-          throw new AppError('Hall not configured for this showtime', 500);
-        }
-
+      if (showtime && showtime.hall) {
         const heldSeatIds = new Map(showtime.seatHolds.map((h) => [h.seatId, h.userId]));
         const bookedSeatIds = new Set(showtime.bookings.flatMap((b) => b.seats.map((s) => s.seatId)));
         const basePrice = Number(showtime.basePrice);
@@ -92,21 +104,33 @@ export class SeatsService {
             heldByCurrentUser: heldByUserId === userId,
           };
         });
-      } catch (err: any) {
-        if (err instanceof AppError) throw err;
+      }
+    } catch (err: any) {
+      if (err instanceof AppError) throw err;
+      if (!isLocalEnv()) {
         throw new AppError('Unable to load seats. Database is unavailable.', 503);
       }
     }
 
-    const hallId = 'hall_1';
+    const mockSt = getMockShowtimeById(showtimeId);
+    const hallId = showtimeId.includes('hall_2') ? 'hall_2' : showtimeId.includes('hall_3') ? 'hall_3' : 'hall_1';
+    const startsAtKey = new Date(mockSt.startsAt).toISOString().slice(0, 16);
     const defaultSeats = this.generateDefaultSeats(hallId);
 
     return defaultSeats.map((seat) => {
+      const cleanSeat = `${seat.row}${seat.number}`;
       const memoryHoldKey = Array.from(memoryHolds.values()).find(
-        (h) => h.showtimeId === showtimeId && h.seatId === seat.id && new Date(h.expiresAt) > now
+        (h) =>
+          ((h.showtimeId === showtimeId) || (h.hallId === hallId && h.startsAtKey === startsAtKey)) &&
+          (h.seatId === seat.id || h.seatId.endsWith(cleanSeat)) &&
+          new Date(h.expiresAt) > now
       );
 
-      const isBooked = memoryBookedSeats.has(`${showtimeId}_${seat.id}`);
+      const isBooked =
+        memoryBookedSeats.has(`${showtimeId}_${seat.id}`) ||
+        memoryBookedSeats.has(`${showtimeId}_${cleanSeat}`) ||
+        memoryBookedSeats.has(`${hallId}_${startsAtKey}_${seat.id}`) ||
+        memoryBookedSeats.has(`${hallId}_${startsAtKey}_${cleanSeat}`);
 
       let status: 'AVAILABLE' | 'HELD' | 'BOOKED' = 'AVAILABLE';
       if (isBooked) status = 'BOOKED';
@@ -127,71 +151,103 @@ export class SeatsService {
 
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-    if (!isLocalEnv()) {
-      try {
-        const holds = await prisma.$transaction(async (tx) => {
-          const now = new Date();
-          const existingHolds = await tx.seatHold.findMany({
-            where: { showtimeId, seatId: { in: seatIds }, expiresAt: { gt: now } },
-          });
+    // ── Past showtime guard ──────────────────────────────────────────────────
+    // Always validate against current time BEFORE touching DB or memory store.
+    // A 10-minute buffer is given (matching real cinema cut-off rules).
+    try {
+      const st = await prisma.showtime.findUnique({ where: { id: showtimeId }, select: { startsAt: true } });
+      if (st && new Date(st.startsAt).getTime() - Date.now() < 10 * 60 * 1000) {
+        throw new AppError('This showtime has already started. Booking is no longer available.', 400);
+      }
+    } catch (e: any) {
+      if (e instanceof AppError) throw e;
+      // DB not available — fall through to memory check below
+      const mockSt = getMockShowtimeById(showtimeId);
+      if (mockSt && new Date(mockSt.startsAt).getTime() - Date.now() < 10 * 60 * 1000) {
+        throw new AppError('This showtime has already started. Booking is no longer available.', 400);
+      }
+    }
 
-          const conflictingHold = existingHolds.find(h => h.userId !== userId);
-          if (conflictingHold) {
-            throw new AppError(`Seat ${conflictingHold.seatId} is currently held by another user.`, 409);
-          }
-
-          const existingBookings = await tx.bookingSeat.findMany({
-            where: {
-              seatId: { in: seatIds },
-              booking: { showtimeId, status: { in: ['CONFIRMED', 'PENDING'] } },
-            },
-          });
-
-          if (existingBookings.length > 0) {
-            throw new AppError('One or more selected seats have already been booked.', 409);
-          }
-
-          await tx.seatHold.deleteMany({
-            where: { showtimeId, seatId: { in: seatIds }, userId },
-          });
-
-          const created = [];
-          for (const seatId of seatIds) {
-            const hold = await tx.seatHold.create({
-              data: { showtimeId, seatId, userId, expiresAt },
-            });
-            created.push(hold);
-          }
-          return created;
+    try {
+      const holds = await prisma.$transaction(async (tx) => {
+        const now = new Date();
+        const existingHolds = await tx.seatHold.findMany({
+          where: { showtimeId, seatId: { in: seatIds }, expiresAt: { gt: now } },
         });
 
-        return { holds, expiresAt };
-      } catch (err: any) {
-        if (err instanceof AppError) throw err;
-        if (err.code === 'P2002') {
-          throw new AppError('One or more seats were locked by another user just now.', 409);
+        const conflictingHold = existingHolds.find(h => h.userId !== userId);
+        if (conflictingHold) {
+          throw new AppError(`Seat ${conflictingHold.seatId} is currently held by another user.`, 409);
         }
+
+        const existingBookings = await tx.bookingSeat.findMany({
+          where: {
+            seatId: { in: seatIds },
+            booking: { showtimeId, status: { in: ['CONFIRMED', 'PENDING'] } },
+          },
+        });
+
+        if (existingBookings.length > 0) {
+          throw new AppError('One or more selected seats have already been booked.', 409);
+        }
+
+        await tx.seatHold.deleteMany({
+          where: { showtimeId, seatId: { in: seatIds }, userId },
+        });
+
+        const created = [];
+        for (const seatId of seatIds) {
+          const hold = await tx.seatHold.create({
+            data: { showtimeId, seatId, userId, expiresAt },
+          });
+          created.push(hold);
+        }
+        return created;
+      });
+
+      return { holds, expiresAt };
+    } catch (err: any) {
+      if (err instanceof AppError) throw err;
+      if (err.code === 'P2002') {
+        throw new AppError('One or more seats were locked by another user just now.', 409);
+      }
+      if (!isLocalEnv()) {
         throw new AppError('Unable to hold seats. Database is unavailable.', 503);
       }
     }
 
     // High performance memory atomic transaction lock for test suite / demo mode
     const now = new Date();
+    const mockSt = getMockShowtimeById(showtimeId);
+    const hallId = showtimeId.includes('hall_2') ? 'hall_2' : showtimeId.includes('hall_3') ? 'hall_3' : 'hall_1';
+    const startsAtKey = new Date(mockSt.startsAt).toISOString().slice(0, 16);
+
     for (const seatId of seatIds) {
+      const { clean: cleanSeat } = parseSeatKey(seatId);
+
       const existing = Array.from(memoryHolds.values()).find(
-        h => h.showtimeId === showtimeId && h.seatId === seatId && new Date(h.expiresAt) > now
+        h =>
+          ((h.showtimeId === showtimeId) || (h.hallId === hallId && h.startsAtKey === startsAtKey)) &&
+          (h.seatId === seatId || h.seatId.endsWith(cleanSeat)) &&
+          new Date(h.expiresAt) > now
       );
       if (existing && existing.userId !== userId) {
         throw new AppError(`Seat is held by another user`, 409);
       }
-      if (memoryBookedSeats.has(`${showtimeId}_${seatId}`)) {
+
+      if (
+        memoryBookedSeats.has(`${showtimeId}_${seatId}`) ||
+        memoryBookedSeats.has(`${showtimeId}_${cleanSeat}`) ||
+        memoryBookedSeats.has(`${hallId}_${startsAtKey}_${seatId}`) ||
+        memoryBookedSeats.has(`${hallId}_${startsAtKey}_${cleanSeat}`)
+      ) {
         throw new AppError(`Seat is already booked`, 409);
       }
     }
 
     const createdHolds = seatIds.map(seatId => {
       const holdId = `hold_${Date.now()}_${Math.random()}_${seatId}`;
-      const holdObj = { id: holdId, showtimeId, seatId, userId, expiresAt };
+      const holdObj = { id: holdId, showtimeId, hallId, startsAtKey, seatId, userId, expiresAt };
       memoryHolds.set(holdId, holdObj);
       return holdObj;
     });
@@ -200,9 +256,13 @@ export class SeatsService {
   }
 
   static async releaseHold(holdId: string, userId: string) {
-    if (!isLocalEnv()) {
+    try {
       await prisma.seatHold.deleteMany({ where: { id: holdId, userId } });
       return true;
+    } catch (e) {
+      if (!isLocalEnv()) {
+        throw new AppError('Unable to release hold. Database is unavailable.', 503);
+      }
     }
     memoryHolds.delete(holdId);
     return true;

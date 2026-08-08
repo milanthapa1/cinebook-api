@@ -1,0 +1,112 @@
+[
+  {
+    "id": "bk_1786204796330",
+    "userId": "cms9200nq0000vphfnsmwzuqn",
+    "showtimeId": "cmskew5hs0003c1zrbcfht8xc",
+    "totalAmount": 509,
+    "status": "CONFIRMED",
+    "qrPayload": "CINEBOOK-TICKET-bk_1786204796330",
+    "createdAt": "2026-08-08T15:59:56.332Z",
+    "seats": [
+      {
+        "id": "bks_1786204796332_cmsacaxtm000duo355obr7m1s",
+        "bookingId": "bk_1786204796330",
+        "seatId": "cmsacaxtm000duo355obr7m1s",
+        "priceAtBooking": 450,
+        "seatDetails": {
+          "row": "A",
+          "number": 1,
+          "type": "STANDARD"
+        }
+      }
+    ],
+    "showtime": {
+      "id": "cmskew5hs0003c1zrbcfht8xc",
+      "startsAt": "2026-08-10T15:59:56.331Z",
+      "movie": {
+        "title": "Into the Wild",
+        "posterUrl": "https://images.unsplash.com/photo-1510312305653-8ed496efae75?auto=format&fit=crop&q=80&w=800",
+        "format": [
+          "IMAX 2D",
+          "DOLBY ATMOS"
+        ],
+        "language": "English",
+        "rating": "PG-13",
+        "runtimeMins": 145
+      },
+      "hall": {
+        "name": "Audi 1 (IMAX Laser)",
+        "screenType": "4K Dual Laser 3D",
+        "soundSystem": "Dolby Atmos 12.1"
+      }
+    },
+    "pricing": {
+      "seatsTotal": 450,
+      "subtotal": 450,
+      "vatAmount": 59,
+      "totalAmount": 509
+    },
+    "payment": {
+      "provider": "esewa",
+      "providerRef": "MOCK_TXN_1786204803502",
+      "amount": 509,
+      "status": "SUCCESS",
+      "createdAt": "2026-08-08T16:00:04.774Z"
+    }
+  },
+  {
+    "id": "bk_1786205213190",
+    "userId": "cms9200nq0000vphfnsmwzuqn",
+    "showtimeId": "cmskew5hs0003c1zrbcfht8xc",
+    "totalAmount": 735,
+    "status": "CONFIRMED",
+    "qrPayload": "CINEBOOK-TICKET-bk_1786205213190",
+    "createdAt": "2026-08-08T16:06:53.190Z",
+    "seats": [
+      {
+        "id": "bks_1786205213190_cmsacawrc000buo3541mt9ttz",
+        "bookingId": "bk_1786205213190",
+        "seatId": "cmsacawrc000buo3541mt9ttz",
+        "priceAtBooking": 650,
+        "seatDetails": {
+          "row": "C",
+          "number": 0,
+          "type": "PREMIUM"
+        }
+      }
+    ],
+    "showtime": {
+      "id": "cmskew5hs0003c1zrbcfht8xc",
+      "startsAt": "2026-08-10T16:06:53.190Z",
+      "movie": {
+        "title": "Into the Wild",
+        "posterUrl": "https://images.unsplash.com/photo-1510312305653-8ed496efae75?auto=format&fit=crop&q=80&w=800",
+        "format": [
+          "IMAX 2D",
+          "DOLBY ATMOS"
+        ],
+        "language": "English",
+        "rating": "PG-13",
+        "runtimeMins": 145
+      },
+      "hall": {
+        "name": "Audi 1",
+        "screenType": "IMAX Laser",
+        "soundSystem": "Dolby Atmos 12.1"
+      }
+    },
+    "pricing": {
+      "seatsTotal": 650,
+      "subtotal": 650,
+      "vatAmount": 85,
+      "totalAmount": 735
+    },
+    "payment": {
+      "provider": "esewa",
+      "providerRef": "MOCK_TXN_1786205223913",
+      "amount": 735,
+      "status": "SUCCESS",
+      "createdAt": "2026-08-08T16:07:05.060Z"
+    }
+  }
+]
