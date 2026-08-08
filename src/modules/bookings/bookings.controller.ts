@@ -5,14 +5,13 @@ import { BookingsService } from './bookings.service.js';
 export class BookingsController {
   static async createBooking(req: AuthRequest, res: Response, next: NextFunction) {
     try {
-      const { showtimeId, seatIds, concessionsAmount } = req.body;
+      const { showtimeId, seatIds } = req.body;
       const userId = req.user!.id;
 
       const booking = await BookingsService.createBooking(
         userId,
         showtimeId,
         seatIds,
-        concessionsAmount || 0
       );
 
       res.status(201).json({

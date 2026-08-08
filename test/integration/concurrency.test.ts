@@ -83,7 +83,6 @@ describe('Concurrency & Seat Hold Race Condition Protection', () => {
       .send({
         showtimeId,
         seatIds: [seatId],
-        concessionsAmount: 300,
       });
 
     expect(bookingRes.status).toBe(201);

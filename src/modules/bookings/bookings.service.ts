@@ -6,8 +6,8 @@ import { SeatsService } from '../seats/seats.service.js';
 
 const memoryBookings = new Map<string, any>();
 
-function attachPricing(booking: any, seatsTotal: number, concessionsAmount: number) {
-  const pricing = computeBookingTotals(seatsTotal, concessionsAmount);
+function attachPricing(booking: any, seatsTotal: number) {
+  const pricing = computeBookingTotals(seatsTotal);
   return { ...booking, pricing };
 }
 
@@ -29,7 +29,7 @@ async function enrichBookingSeats(booking: any) {
 }
 
 export class BookingsService {
-  static async createBooking(userId: string, showtimeId: string, seatIds: string[], concessionsAmount: number = 0) {
+  static async createBooking(userId: string, showtimeId: string, seatIds: string[]) {
     if (!seatIds || seatIds.length === 0) {
       throw new AppError('No seats specified for booking', 400);
     }
@@ -77,7 +77,7 @@ export class BookingsService {
             seatsTotal += finalSeatPrice;
           }
 
-          const { totalAmount } = computeBookingTotals(seatsTotal, concessionsAmount);
+          const { totalAmount } = computeBookingTotals(seatsTotal);
 
           const booking = await tx.booking.create({
             data: {
@@ -103,7 +103,7 @@ export class BookingsService {
             where: { showtimeId, seatId: { in: seatIds }, userId },
           });
 
-          return attachPricing(booking, seatsTotal, concessionsAmount);
+          return attachPricing(booking, seatsTotal);
         });
 
         return enrichBookingSeats(result);
@@ -136,7 +136,7 @@ export class BookingsService {
       };
     });
 
-    const { totalAmount } = computeBookingTotals(seatsTotal, concessionsAmount);
+    const { totalAmount } = computeBookingTotals(seatsTotal);
     const mockBooking = attachPricing(
       {
         id: bookingId,
@@ -166,7 +166,6 @@ export class BookingsService {
         },
       },
       seatsTotal,
-      concessionsAmount,
     );
 
     memoryBookings.set(bookingId, mockBooking);
@@ -191,11 +190,10 @@ export class BookingsService {
         const totalAmount = Number(booking.totalAmount);
         const subtotal = Math.round(totalAmount / (1 + VAT_RATE));
         const vatAmount = totalAmount - subtotal;
-        const concessionsAmount = Math.max(0, subtotal - seatsTotal);
         const enriched = await enrichBookingSeats(booking);
         return {
           ...enriched,
-          pricing: { seatsTotal, concessionsAmount, subtotal, vatAmount, totalAmount },
+          pricing: { seatsTotal, subtotal, vatAmount, totalAmount },
         };
       } catch (e) {
         throw new AppError('Unable to load booking. Database is unavailable.', 503);
