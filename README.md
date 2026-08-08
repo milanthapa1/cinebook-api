@@ -7,7 +7,7 @@ Movie ticket booking platform backend API built with Express, TypeScript, and Pr
 - **Authentication**: JWT-based auth with refresh tokens, Google OAuth support
 - **Movie Management**: CRUD operations for movies with showtimes
 - **Seat Booking**: Real-time seat selection with hold mechanism
-- **Payment Integration**: Khalti and eSewa payment gateway support
+- **Payment Integration**: eSewa payment gateway support
 - **Admin Panel**: Full admin capabilities for managing movies, halls, showtimes, and bookings
 - **Rate Limiting**: Built-in rate limiting for API protection
 
@@ -38,8 +38,8 @@ CLIENT_URL="http://localhost:5173"
 CLOUDINARY_CLOUD_NAME="your_cloudinary_cloud_name"
 CLOUDINARY_API_KEY="your_cloudinary_api_key"
 CLOUDINARY_API_SECRET="your_cloudinary_api_secret"
-KHALTI_SECRET_KEY="your_khalti_secret_key"
 ESEWA_MERCHANT_CODE="your_esewa_merchant_code"
+ESEWA_VERIFY_URL="https://uat.esewa.com.np/epay/main"
 GOOGLE_CLIENT_ID="your_google_client_id" # Optional
 ```
 
